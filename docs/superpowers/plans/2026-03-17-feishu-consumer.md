@@ -256,6 +256,17 @@ describe('FeishuClient', () => {
     await client.sendMessage('ou_test', 'open_id', 'interactive', cardContent);
     expect(true).toBe(true);
   });
+
+  it('should build markdown card', () => {
+    const card = FeishuClient.buildMarkdownCard('# Hello\n\nThis is **bold**');
+    expect(card).toEqual({
+      schema: '2.0',
+      config: { wide_screen_mode: true },
+      body: {
+        elements: [{ tag: 'markdown', content: '# Hello\n\nThis is **bold**' }],
+      },
+    });
+  });
 });
 ```
 
