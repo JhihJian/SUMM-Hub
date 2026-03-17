@@ -4,8 +4,12 @@ import { SessionManager } from './session';
 import { ownsSession } from './utils/hash';
 import type { InputMessage, OutputMessage, ConsumerConfig, SDKMessage } from './utils/types';
 
-const INPUT_SUBJECT = 'summ.ai.input';
-const OUTPUT_SUBJECT = 'summ.ai.output';
+/**
+ * 构建 NATS 主题名称
+ */
+function buildSubject(entityType: string, suffix: string): string {
+  return `summ.${entityType}.${suffix}`;
+}
 
 /**
  * NATS Consumer
@@ -16,10 +20,14 @@ export class ClaudeConsumer {
   private sub: Subscription | null = null;
   private config: ConsumerConfig;
   private sessionManager: SessionManager;
+  private inputSubject: string;
+  private outputSubject: string;
 
   constructor(config: ConsumerConfig) {
     this.config = config;
     this.sessionManager = new SessionManager(config.sessionTtlMs);
+    this.inputSubject = buildSubject(config.entityType, 'input');
+    this.outputSubject = buildSubject(config.entityType, 'output');
   }
 
   /**
@@ -42,11 +50,11 @@ export class ClaudeConsumer {
       throw new Error('Not connected to NATS');
     }
 
-    this.sub = this.nc.subscribe(INPUT_SUBJECT, {
+    this.sub = this.nc.subscribe(this.inputSubject, {
       queue: 'claude-consumers',
     });
 
-    console.log(`[NATS] Subscribed to ${INPUT_SUBJECT}`);
+    console.log(`[NATS] Subscribed to ${this.inputSubject}`);
 
     // 启动 Session 清理
     this.sessionManager.startCleanup();
@@ -109,7 +117,9 @@ export class ClaudeConsumer {
     let session = this.sessionManager.get(sessionId);
 
     if (!session) {
-      session = this.sessionManager.create(sessionId, process.cwd());
+      // 使用配置的工作目录，支持外部挂载
+      const workspaceDir = this.config.workspaceDir || process.cwd();
+      session = this.sessionManager.create(sessionId, workspaceDir);
     }
 
     // 创建 Executor

@@ -1,0 +1,59 @@
+# Claude Code Consumer - Production Deployment
+#
+# Usage:
+#   1. Copy this file to your server
+#   2. Set environment variables:
+#      export ANTHROPIC_BASE_URL="your-base-url"
+#      export ANTHROPIC_AUTH_TOKEN="your-token"
+#   3. Run: docker compose up -d
+#
+# Configuration:
+#   - ENTITY_TYPE: 实体类型，用于构建 NATS 主题（默认 "ai"）
+#   - WORKSPACE_DIR: Claude 运行时工作目录（默认 "/workspace"）
+#   - 可通过挂载 volumes 自定义工作目录内容
+
+services:
+  nats:
+    image: nats:2.10
+    command: ["-js", "-m", "8222", "-sd", "/data/nats"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data/nats
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  consumer:
+    image: ghcr.io/summ-hub/claude-code-consumer:latest
+    environment:
+      NATS_URL: "nats://nats:4222"
+      CONSUMER_ID: "0"
+      CONSUMER_TOTAL: "1"
+      SESSION_TTL_MS: "3600000"
+      # 实体类型 - 用于构建 NATS 主题 summ.{ENTITY_TYPE}.input
+      ENTITY_TYPE: ${ENTITY_TYPE:-ai}
+      # Claude 工作目录 - 可通过 volumes 挂载外部项目
+      WORKSPACE_DIR: ${WORKSPACE_DIR:-/workspace}
+      # Anthropic API 凭证
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
+    depends_on:
+      - nats
+    restart: unless-stopped
+    volumes:
+      # 挂载工作目录 - 修改此路径以使用外部项目
+      - workspace_data:/workspace
+      # 挂载 Claude 配置目录（认证缓存等）
+      - claude_config:/root/.claude
+      # 如需使用本地项目，取消下面的注释并修改路径
+      # - /path/to/your/project:/workspace:ro
+
+volumes:
+  nats_data:
+  workspace_data:
+  claude_config:

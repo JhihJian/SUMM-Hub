@@ -1,0 +1,44 @@
+services:
+  nats:
+    image: nats:2.10
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
+  consumer:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      NATS_URL: "nats://nats:4222"
+      CONSUMER_ID: "0"
+      CONSUMER_TOTAL: "1"
+      SESSION_TTL_MS: "3600000"
+      # 实体类型 - 与 tester 保持一致
+      ENTITY_TYPE: ${ENTITY_TYPE:-ai}
+      # 工作目录
+      WORKSPACE_DIR: "/workspace"
+      # Anthropic API 凭证
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
+    depends_on:
+      - nats
+    restart: "no"
+
+  tester:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      NATS_URL: "nats://nats:4222"
+      # 实体类型 - 与 consumer 保持一致
+      ENTITY_TYPE: ${ENTITY_TYPE:-ai}
+      # Anthropic API 凭证
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
+    depends_on:
+      - nats
+      - consumer
+    command: ["npx", "ts-node", "test-integration/test-runner.ts"]
+    restart: "no"

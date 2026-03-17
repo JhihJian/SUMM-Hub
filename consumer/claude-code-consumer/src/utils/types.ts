@@ -74,4 +74,8 @@ export interface ConsumerConfig {
   consumerTotal: number;
   /** Session 过期时间 (ms) */
   sessionTtlMs: number;
+  /** 实体类型（用于构建 NATS 主题，如 "summ.{entityType}.input"） */
+  entityType: string;
+  /** Claude 运行时工作目录（用于会话的默认工作目录） */
+  workspaceDir: string;
 }

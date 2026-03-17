@@ -10,6 +10,8 @@ function loadConfig(): ConsumerConfig {
     consumerId: parseInt(process.env.CONSUMER_ID || '0', 10),
     consumerTotal: parseInt(process.env.CONSUMER_TOTAL || '1', 10),
     sessionTtlMs: parseInt(process.env.SESSION_TTL_MS || '3600000', 10),
+    entityType: process.env.ENTITY_TYPE || 'ai',
+    workspaceDir: process.env.WORKSPACE_DIR || process.cwd(),
   };
 }
 
@@ -26,6 +28,8 @@ async function main(): Promise<void> {
     consumerId: config.consumerId,
     consumerTotal: config.consumerTotal,
     sessionTtlMs: config.sessionTtlMs,
+    entityType: config.entityType,
+    workspaceDir: config.workspaceDir,
   });
 
   // 优雅退出处理

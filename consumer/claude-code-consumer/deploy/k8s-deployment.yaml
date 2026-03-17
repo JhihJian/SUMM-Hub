@@ -1,0 +1,163 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: summ-hub
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: anthropic-credentials
+  namespace: summ-hub
+type: Opaque
+stringData:
+  ANTHROPIC_BASE_URL: "your-base-url"
+  ANTHROPIC_AUTH_TOKEN: "your-token"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: consumer-config
+  namespace: summ-hub
+data:
+  ENTITY_TYPE: "ai"
+  WORKSPACE_DIR: "/workspace"
+  CONSUMER_TOTAL: "3"
+  SESSION_TTL_MS: "3600000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claude-code-consumer
+  namespace: summ-hub
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: claude-code-consumer
+  template:
+    metadata:
+      labels:
+        app: claude-code-consumer
+    spec:
+      containers:
+        - name: consumer
+          image: ghcr.io/summ-hub/claude-code-consumer:latest
+          env:
+            - name: NATS_URL
+              value: "nats://nats:4222"
+            - name: CONSUMER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: ENTITY_TYPE
+              valueFrom:
+                configMapKeyRef:
+                  name: consumer-config
+                  key: ENTITY_TYPE
+            - name: WORKSPACE_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: consumer-config
+                  key: WORKSPACE_DIR
+            - name: CONSUMER_TOTAL
+              valueFrom:
+                configMapKeyRef:
+                  name: consumer-config
+                  key: CONSUMER_TOTAL
+            - name: SESSION_TTL_MS
+              valueFrom:
+                configMapKeyRef:
+                  name: consumer-config
+                  key: SESSION_TTL_MS
+            - name: ANTHROPIC_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: anthropic-credentials
+                  key: ANTHROPIC_BASE_URL
+            - name: ANTHROPIC_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: anthropic-credentials
+                  key: ANTHROPIC_AUTH_TOKEN
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: claude-config
+              mountPath: /root/.claude
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: workspace-pvc
+        - name: claude-config
+          emptyDir: {}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workspace-pvc
+  namespace: summ-hub
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nats
+  namespace: summ-hub
+spec:
+  serviceName: nats
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats
+  template:
+    metadata:
+      labels:
+        app: nats
+    spec:
+      containers:
+        - name: nats
+          image: nats:2.10
+          args: ["-js", "-m", "8222"]
+          ports:
+            - containerPort: 4222
+            - containerPort: 8222
+          volumeMounts:
+            - name: nats-data
+              mountPath: /tmp/nats
+  volumeClaimTemplates:
+    - metadata:
+        name: nats-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  namespace: summ-hub
+spec:
+  selector:
+    app: nats
+  ports:
+    - port: 4222
+      targetPort: 4222
+      name: client
+    - port: 8222
+      targetPort: 8222
+      name: monitor

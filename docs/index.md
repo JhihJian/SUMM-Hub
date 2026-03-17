@@ -59,6 +59,7 @@ SUMM-Hub 是一个**消息集散中心**：
 | 文档 | 说明 |
 |------|------|
 | [快速开始](./getting-started.md) | 5 分钟上手指南 |
+| [消息能力清单](./capabilities.md) | 支持的消息类型和格式速查 |
 | [协议规范](./protocol.md) | Subject 格式、消息格式、路由规则 |
 | [Subject 设计](./subject-design.md) | Subject 命名规范 |
 | [消息格式](./message-format.md) | Payload 和 Headers 定义 |
