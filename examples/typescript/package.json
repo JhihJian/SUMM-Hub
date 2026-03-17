@@ -1,0 +1,21 @@
+{
+  "name": "summ-hub-producer",
+  "version": "1.0.0",
+  "description": "SUMM-Hub TypeScript Producer 示例",
+  "main": "dist/producer.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/producer.ts",
+    "start:dev": "ts-node src/producer.ts"
+  },
+  "dependencies": {
+    "nats": "^2.18.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/uuid": "^9.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}
