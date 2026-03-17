@@ -144,34 +144,45 @@ consumer/feishu-consumer/
 
 ### 1. FeishuClient (feishu.ts)
 
-封装飞书开放平台 API：
+使用官方 SDK `@larksuiteoapi/node-sdk` 封装飞书 API：
 
 ```typescript
+import * as Lark from '@larksuiteoapi/node-sdk';
+
 class FeishuClient {
-  private appId: string;
-  private appSecret: string;
-  private accessToken: string | null = null;
-  private tokenExpiresAt: number = 0;
+  private client: Lark.Client;
 
-  constructor(appId: string, appSecret: string);
+  constructor(appId: string, appSecret: string) {
+    this.client = new Lark.Client({
+      appId,
+      appSecret,
+      domain: Lark.Domain.Feishu, // https://open.feishu.cn
+    });
+  }
 
-  // 获取 tenant_access_token（自动缓存和刷新）
-  async getAccessToken(): Promise<string>;
-
-  // 发送消息
+  // 发送消息（SDK 自动处理 token 获取和刷新）
   async sendMessage(
     receiveId: string,
     receiveIdType: string,
     msgType: 'text' | 'interactive',
-    content: string | object
-  ): Promise<void>;
+    content: object
+  ): Promise<void> {
+    await this.client.im.v1.message.create({
+      params: { receive_id_type: receiveIdType },
+      data: {
+        receive_id: receiveId,
+        msg_type: msgType,
+        content: JSON.stringify(content),
+      },
+    });
+  }
 }
 ```
 
-**Token 管理：**
-- 首次调用时获取 token
-- 缓存 token 直到过期前 5 分钟
-- 过期时自动刷新
+**SDK 优势：**
+- 自动管理 tenant_access_token 的获取和刷新
+- 类型安全的 API 调用
+- 内置错误处理和重试
 
 ### 2. FeishuConsumer (consumer.ts)
 
@@ -287,7 +298,7 @@ CMD ["node", "dist/index.js"]
 | 包名 | 版本 | 用途 |
 |-----|------|------|
 | `nats` | ^2.18.0 | NATS 客户端 |
-| `node-fetch` | ^3.x | HTTP 请求（或使用原生 fetch） |
+| `@larksuiteoapi/node-sdk` | ^1.x | 飞书官方 SDK（自动管理 token） |
 
 ---
 
