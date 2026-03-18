@@ -18,5 +18,32 @@ services:
       timeout: 5s
       retries: 3
 
+  feishu-consumer:
+    build: ./consumer/feishu-consumer
+    environment:
+      - NATS_URL=nats://nats:4222
+      - FEISHU_APP_ID=${FEISHU_APP_ID}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET}
+      - FEISHU_RECEIVER_ID=${FEISHU_RECEIVER_ID}
+      - FEISHU_RECEIVER_TYPE=${FEISHU_RECEIVER_TYPE:-open_id}
+      - E2E_MODE=${E2E_MODE:-false}
+    depends_on:
+      nats:
+        condition: service_healthy
+
+  feishu-e2e:
+    build:
+      context: ./consumer/feishu-consumer
+      dockerfile: Dockerfile.e2e
+    environment:
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      nats:
+        condition: service_healthy
+      feishu-consumer:
+        condition: service_started
+    profiles:
+      - test
+
 volumes:
   nats-data:
