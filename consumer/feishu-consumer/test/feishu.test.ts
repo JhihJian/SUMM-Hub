@@ -4,7 +4,9 @@ import type { FeishuConfig } from '../src/types';
 
 // Mock @larksuiteoapi/node-sdk
 vi.mock('@larksuiteoapi/node-sdk', () => {
-  const mockMessageCreate = vi.fn();
+  const mockMessageCreate = vi.fn().mockResolvedValue({
+    data: { msg_id: 'test_message_id_123' },
+  });
   return {
     Client: vi.fn().mockImplementation(() => ({
       im: {
@@ -41,9 +43,8 @@ describe('FeishuClient', () => {
   });
 
   it('should send text message', async () => {
-    await client.sendMessage('ou_test', 'open_id', 'text', { text: 'hello' });
-    // 验证调用（SDK mock）
-    expect(true).toBe(true);
+    const result = await client.sendMessage('ou_test', 'open_id', 'text', { text: 'hello' });
+    expect(result.messageId).toBe('test_message_id_123');
   });
 
   it('should send card message', async () => {
@@ -53,8 +54,8 @@ describe('FeishuClient', () => {
         elements: [],
       },
     };
-    await client.sendMessage('ou_test', 'open_id', 'interactive', cardContent);
-    expect(true).toBe(true);
+    const result = await client.sendMessage('ou_test', 'open_id', 'interactive', cardContent);
+    expect(result.messageId).toBe('test_message_id_123');
   });
 
   it('should build markdown card', () => {

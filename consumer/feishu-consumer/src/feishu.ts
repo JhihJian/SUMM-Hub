@@ -2,6 +2,13 @@ import * as Lark from '@larksuiteoapi/node-sdk';
 import type { FeishuMessageType } from './types';
 
 /**
+ * 发送消息结果
+ */
+export interface SendMessageResult {
+  messageId: string;
+}
+
+/**
  * 飞书消息卡片结构
  */
 interface FeishuCard {
@@ -36,8 +43,8 @@ export class FeishuClient {
     receiveIdType: string,
     msgType: FeishuMessageType,
     content: object
-  ): Promise<void> {
-    await this.client.im.v1.message.create({
+  ): Promise<SendMessageResult> {
+    const response = await this.client.im.v1.message.create({
       params: {
         receive_id_type: receiveIdType as 'open_id' | 'user_id' | 'union_id' | 'email' | 'chat_id',
       },
@@ -47,6 +54,10 @@ export class FeishuClient {
         content: JSON.stringify(content),
       },
     });
+
+    return {
+      messageId: response.data?.msg_id || '',
+    };
   }
 
   /**
