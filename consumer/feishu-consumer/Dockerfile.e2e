@@ -1,0 +1,18 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY tsconfig.json tsconfig.e2e.json ./
+COPY src ./src
+COPY test-integration ./test-integration
+
+RUN npx tsc -p tsconfig.e2e.json
+
+ENV NATS_URL=nats://localhost:4222
+ENV E2E_MODE=true
+ENV E2E_TIMEOUT_MS=10000
+
+CMD ["node", "dist/test-integration/e2e-runner.js"]
