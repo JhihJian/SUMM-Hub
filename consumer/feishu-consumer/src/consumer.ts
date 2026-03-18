@@ -61,13 +61,23 @@ export class FeishuConsumer {
     const content = FeishuConsumer.formatContent(notify.content, msgType);
 
     try {
-      await this.feishu.sendMessage(
+      const result = await this.feishu.sendMessage(
         this.config.receiverId,
         this.config.receiverType,
         msgType,
         content
       );
-      console.log(`[Feishu] Message sent to ${this.config.receiverId}: ${msgType}`);
+      console.log(`[Feishu] Message sent: ${result.messageId}`);
+
+      // 测试模式：发布确认消息
+      if (process.env.E2E_MODE && this.nc) {
+        this.nc.publish('test.e2e.ack', new TextEncoder().encode(JSON.stringify({
+          messageId: result.messageId,
+          originalId: notify.id,
+          msgType,
+          timestamp: Date.now(),
+        })));
+      }
     } catch (e) {
       console.error('[Feishu] Failed to send message:', e);
     }

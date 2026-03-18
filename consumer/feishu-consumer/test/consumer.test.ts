@@ -5,7 +5,7 @@ import type { FeishuConfig, NotifyMessage } from '../src/types';
 // Mock FeishuClient first (no hoisting issues)
 vi.mock('../src/feishu', () => ({
   FeishuClient: vi.fn().mockImplementation(() => ({
-    sendMessage: vi.fn().mockResolvedValue(undefined),
+    sendMessage: vi.fn().mockResolvedValue({ messageId: 'test_msg_id' }),
   })),
 }));
 
