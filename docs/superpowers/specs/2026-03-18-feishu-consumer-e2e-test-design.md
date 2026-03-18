@@ -36,8 +36,15 @@ consumer/feishu-consumer/
 │   └── e2e-runner.ts      # 新增：E2E 测试脚本
 ├── Dockerfile             # 新增：运行镜像
 ├── Dockerfile.e2e         # 新增：测试镜像
+├── tsconfig.e2e.json      # 新增：E2E 测试专用 TypeScript 配置
 └── package.json           # 修改：添加 test:e2e 脚本
 ```
+
+## 先决条件
+
+1. NATS stream `summ.notify.event` 必须存在（运行 `./scripts/setup-streams.sh`）
+2. 有效的飞书应用凭证，已开通 `im:message:send_as_bot` 权限
+3. 测试接收者 ID（open_id/user_id/union_id/email/chat_id）
 
 ## 修改点
 
@@ -219,7 +226,23 @@ ENV E2E_MODE=false
 CMD ["node", "dist/index.js"]
 ```
 
-### 5. Dockerfile.e2e
+### 5. TypeScript E2E 配置
+
+**文件**: `tsconfig.e2e.json`
+
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*", "test-integration/**/*"],
+  "exclude": ["node_modules"]
+}
+```
+
+### 6. Dockerfile.e2e
 
 **文件**: `Dockerfile.e2e`
 
@@ -231,11 +254,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.e2e.json ./
 COPY src ./src
 COPY test-integration ./test-integration
 
-RUN npx tsc
+RUN npx tsc -p tsconfig.e2e.json
 
 ENV NATS_URL=nats://localhost:4222
 ENV E2E_MODE=true
@@ -244,7 +267,7 @@ ENV E2E_TIMEOUT_MS=10000
 CMD ["node", "dist/test-integration/e2e-runner.js"]
 ```
 
-### 6. 更新 docker-compose.yml
+### 7. 更新 docker-compose.yml
 
 **文件**: `docker-compose.yml`（追加）
 
@@ -269,13 +292,15 @@ CMD ["node", "dist/test-integration/e2e-runner.js"]
     environment:
       - NATS_URL=nats://nats:4222
     depends_on:
-      - nats
-      - feishu-consumer
+      nats:
+        condition: service_healthy
+      feishu-consumer:
+        condition: service_started
     profiles:
       - test
 ```
 
-### 7. 更新 package.json scripts
+### 8. 更新 package.json scripts
 
 ```json
 {
@@ -302,8 +327,10 @@ export FEISHU_APP_ID=cli_xxx
 export FEISHU_APP_SECRET=xxx
 export FEISHU_RECEIVER_ID=ou_xxx
 
-# 构建并运行
-npm run build
+# 构建 E2E 测试（使用 e2e 配置）
+npx tsc -p tsconfig.e2e.json
+
+# 运行测试
 npm run test:e2e
 ```
 
