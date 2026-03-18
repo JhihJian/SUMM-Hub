@@ -267,27 +267,42 @@ ENV E2E_TIMEOUT_MS=10000
 CMD ["node", "dist/test-integration/e2e-runner.js"]
 ```
 
-### 7. 更新 docker-compose.yml
+### 7. 创建 docker-compose.e2e.yml
 
-**文件**: `docker-compose.yml`（追加）
+**文件**: `consumer/feishu-consumer/docker-compose.e2e.yml`（独立配置）
 
 ```yaml
+# E2E 测试 Docker Compose 配置
+services:
+  nats:
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+    command: -js -sd /data -m 8222
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   feishu-consumer:
-    build: ./consumer/feishu-consumer
+    build:
+      context: .
+      dockerfile: Dockerfile
     environment:
       - NATS_URL=nats://nats:4222
       - FEISHU_APP_ID=${FEISHU_APP_ID}
       - FEISHU_APP_SECRET=${FEISHU_APP_SECRET}
       - FEISHU_RECEIVER_ID=${FEISHU_RECEIVER_ID}
       - FEISHU_RECEIVER_TYPE=${FEISHU_RECEIVER_TYPE:-open_id}
-      - E2E_MODE=${E2E_MODE:-false}
+      - E2E_MODE=true
     depends_on:
       nats:
         condition: service_healthy
 
   feishu-e2e:
     build:
-      context: ./consumer/feishu-consumer
+      context: .
       dockerfile: Dockerfile.e2e
     environment:
       - NATS_URL=nats://nats:4222
@@ -296,8 +311,6 @@ CMD ["node", "dist/test-integration/e2e-runner.js"]
         condition: service_healthy
       feishu-consumer:
         condition: service_started
-    profiles:
-      - test
 ```
 
 ### 8. 更新 package.json scripts
@@ -337,6 +350,8 @@ npm run test:e2e
 ### Docker Compose 运行
 
 ```bash
+cd consumer/feishu-consumer
+
 # 创建 .env 文件（或使用系统环境变量）
 cat > .env << EOF
 FEISHU_APP_ID=cli_xxx
@@ -345,7 +360,7 @@ FEISHU_RECEIVER_ID=ou_xxx
 EOF
 
 # 运行 E2E 测试
-docker compose --profile test up feishu-e2e
+docker compose -f docker-compose.e2e.yml up feishu-e2e
 ```
 
 ## 环境变量
