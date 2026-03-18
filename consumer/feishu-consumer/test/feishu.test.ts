@@ -5,7 +5,7 @@ import type { FeishuConfig } from '../src/types';
 // Mock @larksuiteoapi/node-sdk
 vi.mock('@larksuiteoapi/node-sdk', () => {
   const mockMessageCreate = vi.fn().mockResolvedValue({
-    data: { message_id: 'test_message_id_123' },
+    data: { msg_id: 'test_message_id_123' },
   });
   return {
     Client: vi.fn().mockImplementation(() => ({
