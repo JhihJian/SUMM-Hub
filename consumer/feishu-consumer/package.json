@@ -5,10 +5,12 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "build:e2e": "tsc -p tsconfig.e2e.json",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "node dist/test-integration/e2e-runner.js"
   },
   "dependencies": {
     "nats": "^2.18.0",
