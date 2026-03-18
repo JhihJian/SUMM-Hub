@@ -56,7 +56,7 @@ export class FeishuClient {
     });
 
     return {
-      messageId: response.data?.msg_id || '',
+      messageId: response.data?.message_id || '',
     };
   }
 
