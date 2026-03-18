@@ -434,31 +434,48 @@ git commit -m "feat(feishu-consumer): Add test:e2e and build:e2e scripts"
 
 ---
 
-## Task 7: 更新 docker-compose.yml
+## Task 7: 创建 docker-compose.e2e.yml
 
-**目标**: 添加 feishu-consumer 和 feishu-e2e 服务
+**目标**: 创建独立的 E2E 测试 Docker Compose 配置（不污染根目录配置）
 
-### 7.1 更新 docker-compose.yml
+### 7.1 创建 docker-compose.e2e.yml
 
-**文件**: `docker-compose.yml`（追加以下内容）
+**文件**: `consumer/feishu-consumer/docker-compose.e2e.yml`
 
 ```yaml
+# E2E 测试 Docker Compose 配置
+# 使用方法: docker compose -f docker-compose.e2e.yml up
+
+services:
+  nats:
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+    command: -js -sd /data -m 8222
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   feishu-consumer:
-    build: ./consumer/feishu-consumer
+    build:
+      context: .
+      dockerfile: Dockerfile
     environment:
       - NATS_URL=nats://nats:4222
       - FEISHU_APP_ID=${FEISHU_APP_ID}
       - FEISHU_APP_SECRET=${FEISHU_APP_SECRET}
       - FEISHU_RECEIVER_ID=${FEISHU_RECEIVER_ID}
       - FEISHU_RECEIVER_TYPE=${FEISHU_RECEIVER_TYPE:-open_id}
-      - E2E_MODE=${E2E_MODE:-false}
+      - E2E_MODE=true
     depends_on:
       nats:
         condition: service_healthy
 
   feishu-e2e:
     build:
-      context: ./consumer/feishu-consumer
+      context: .
       dockerfile: Dockerfile.e2e
     environment:
       - NATS_URL=nats://nats:4222
@@ -467,21 +484,19 @@ git commit -m "feat(feishu-consumer): Add test:e2e and build:e2e scripts"
         condition: service_healthy
       feishu-consumer:
         condition: service_started
-    profiles:
-      - test
 ```
 
 ### 7.2 验证配置
 
 ```bash
-docker compose config --quiet
+cd consumer/feishu-consumer && docker compose -f docker-compose.e2e.yml config --quiet
 ```
 
 ### 7.3 提交
 
 ```bash
-git add docker-compose.yml
-git commit -m "feat: Add feishu-consumer and feishu-e2e to docker-compose"
+git add consumer/feishu-consumer/docker-compose.e2e.yml
+git commit -m "feat(feishu-consumer): Add standalone docker-compose.e2e.yml"
 ```
 
 ---
