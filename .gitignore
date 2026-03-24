@@ -18,6 +18,10 @@ go.work
 # TypeScript
 *.tsbuildinfo
 
+# Worktrees
+.worktrees/
+worktrees/
+
 # IDE
 .idea/
 .vscode/
