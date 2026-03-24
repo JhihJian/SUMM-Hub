@@ -1,0 +1,80 @@
+# E2E Test Configuration for Web Consumer/Producer
+# Uses external NATS on port 6422
+#
+# Usage:
+#   1. Start local NATS: docker run -d --name nats-e2e -p 6422:4222 nats:2.10-alpine --jetstream
+#   2. Run E2E stack: docker compose -f docker-compose.e2e.yml up --build
+#   3. Run tests: cd test-e2e && npm test
+#
+# Prerequisites:
+#   - NATS running on localhost:6422
+#   - nats CLI installed (for mock-ai-response.sh)
+
+services:
+  # Frontend - Vite dev server
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - summ-e2e-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Backend - Hono API server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NATS_URL=nats://host.docker.internal:6422
+      - FRONTEND_URL=http://localhost:5173
+    networks:
+      - summ-e2e-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Mock Consumer - Echo responses for E2E testing
+  mock-consumer:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ../consumer/script-consumer:/consumer
+      - ./scripts:/scripts
+    environment:
+      - NATS_URL=nats://host.docker.internal:6422
+      - SUBJECT=summ.ai.input
+      - COMMAND=sh /scripts/mock-ai-response.sh
+    command: >
+      sh -c "
+        apk add --no-cache curl jq bash &&
+        cd /tmp &&
+        curl -fsSL -o nats.zip 'https://github.com/nats-io/natscli/releases/download/v0.1.5/nats-0.1.5-linux-amd64.zip' &&
+        unzip nats.zip -d /usr/local/bin nats-0.1.5-linux-amd64/nats &&
+        mv /usr/local/bin/nats-0.1.5-linux-amd64/nats /usr/local/bin/nats &&
+        chmod +x /usr/local/bin/nats &&
+        rm -rf nats.zip /usr/local/bin/nats-0.1.5-linux-amd64 &&
+        cd /consumer &&
+        npm install &&
+        npm start
+      "
+    networks:
+      - summ-e2e-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  summ-e2e-network:
+    driver: bridge
