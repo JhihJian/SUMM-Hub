@@ -49,8 +49,8 @@
 ### Backend 角色
 
 1. **Producer**: 前端发消息 → Backend → NATS `summ.ai.input`
-2. **订阅者**: 订阅 `summ.ai.output`，通过 SSE 推送给前端
-3. **会话存储**: 维护 session 列表（内存或简单持久化）
+2. **订阅者**: 订阅 `summ.ai.output` 和 `summ.ai.error`，通过 SSE 推送给前端
+3. **会话存储**: 维护 session 列表（**MVP 阶段仅内存存储，重启后丢失**）
 
 ### Frontend 角色
 
@@ -74,7 +74,7 @@ SUMM-Hub/
 │   │   │   │   └── events.ts         # SSE 实时推送
 │   │   │   ├── services/
 │   │   │   │   ├── nats.ts           # NATS 连接与发布
-│   │   │   │   └── sessionStore.ts   # Session 存储（内存 Map）
+│   │   │   │   └── sessionStore.ts   # Session 存储（MVP: 内存 Map）
 │   │   │   └── types.ts              # 类型定义
 │   │   ├── package.json
 │   │   └── tsconfig.json
@@ -113,7 +113,7 @@ SUMM-Hub/
 | GET | `/api/sessions` | 获取 session 列表 | - | `{ sessions: Session[] }` |
 | POST | `/api/sessions` | 创建新 session | - | `{ session: Session }` |
 | GET | `/api/sessions/:id/messages` | 获取历史消息 | - | `{ messages: Message[] }` |
-| POST | `/api/sessions/:id/messages` | 发送消息 | `{ text: string }` | `{ ok: true }` |
+| POST | `/api/sessions/:id/messages` | 发送消息 | `{ content: string }` | `{ ok: true }` |
 | GET | `/api/events` | SSE 连接 | - | SSE stream |
 
 ### SSE 事件格式
@@ -122,8 +122,15 @@ SUMM-Hub/
 type SSEEvent =
   | { type: 'message'; data: Message }
   | { type: 'session-created'; data: Session }
+  | { type: 'error'; data: { sessionId: string; code: string; message: string } }
   | { type: 'heartbeat'; data: { timestamp: number } }
 ```
+
+### SSE 心跳配置
+
+- **心跳间隔**: 30 秒
+- **超时检测**: 前端 90 秒未收到任何消息（包括心跳）则认为连接断开，自动重连
+- **实现方式**: Backend 定时发送 heartbeat 事件，前端 useSSE hook 监控最后收到消息的时间
 
 ### 消息流
 
@@ -137,25 +144,61 @@ Backend 发布到 NATS "summ.ai.input"
 Consumer 处理，发布到 "summ.ai.output"
         │
         ▼
-Backend 订阅 "summ.ai.output"（按 session 过滤）
+Backend 订阅 "summ.ai.output"（应用层过滤）
         │
         ▼
 SSE 推送给前端
+```
+
+### NATS 订阅策略
+
+Backend 订阅 `summ.ai.output` 和 `summ.ai.error`，在**应用层**按 session 过滤：
+
+```typescript
+// 订阅所有 output 消息
+nc.subscribe('summ.ai.output', {
+  callback: (err, msg) => {
+    const output = JSON.parse(msg.data)
+    const sessionId = output.session
+
+    // 只推送给有活跃 SSE 连接的 session
+    if (activeSSEConnections.has(sessionId)) {
+      pushToSSE(sessionId, {
+        type: 'message',
+        data: convertToFrontendMessage(output)
+      })
+    }
+  }
+})
+
+// 订阅错误消息
+nc.subscribe('summ.ai.error', {
+  callback: (err, msg) => {
+    const error = JSON.parse(msg.data)
+    pushToSSE(error.session, {
+      type: 'error',
+      data: { sessionId: error.session, code: error.code, message: error.message }
+    })
+  }
+})
 ```
 
 ---
 
 ## 数据类型
 
+> **注意**: 以下类型是 Web Backend/Frontend 的**内部表示**，与 NATS 协议格式（见 `docs/protocol.md`）不同。
+> Backend 负责在 NATS 协议格式和内部格式之间转换。
+
 ```typescript
-// Session
+// Session（内部表示）
 interface Session {
   id: string           // sess_xxx
   createdAt: number    // timestamp
   updatedAt: number    // timestamp
 }
 
-// 消息
+// 消息（内部表示，用于前端渲染）
 interface Message {
   id: string
   sessionId: string
@@ -164,9 +207,9 @@ interface Message {
   timestamp: number
 }
 
-// 发送消息请求
+// 发送消息请求（API 入口）
 interface SendMessageRequest {
-  text: string
+  content: string      // 与 claude-code-consumer 的 InputMessage.content 保持一致
 }
 
 // API 响应
@@ -177,6 +220,26 @@ interface SessionsResponse {
 interface MessagesResponse {
   messages: Message[]
 }
+```
+
+### NATS 协议映射
+
+Web Backend 负责将内部格式转换为 NATS 协议格式：
+
+```
+前端 Message              NATS InputMessage (summ.ai.input)
+{                        {
+  sessionId: "sess_x",    session: "sess_x",
+  role: "user",    ───►   content: { text: "..." },
+  content: "..."          context: { source: "web" }
+}                        }
+
+NATS OutputMessage        前端 Message
+{                        {
+  session: "sess_x",      sessionId: "sess_x",
+  type: "content",  ───►   role: "assistant",
+  content: "..."          content: "..."
+}                        }
 ```
 
 ---
@@ -270,6 +333,73 @@ Backend 发布到 NATS summ.ai.input
 Consumer 发布到 summ.ai.output
 Backend 接收，SSE 推送给前端
 前端追加 AI 消息到列表
+```
+
+---
+
+## 错误处理
+
+### HTTP API 错误码
+
+| 场景 | HTTP 状态码 | 说明 |
+|------|------------|------|
+| Session 不存在 | 404 | GET/POST `/api/sessions/:id/messages` |
+| 请求体无效 | 400 | 缺少 `content` 字段 |
+| NATS 连接失败 | 503 | Backend 无法连接到 NATS |
+| 消息发送失败 | 500 | NATS 发布失败 |
+
+### Consumer 错误传播
+
+当 Consumer 发布错误到 `summ.ai.error` 时：
+
+```
+Consumer 发布到 summ.ai.error
+        │
+        ▼
+Backend 接收，转换为 SSE error 事件
+        │
+        ▼
+前端收到 { type: 'error', data: { code, message } }
+        │
+        ▼
+前端显示错误提示，如 "会话已失效"
+```
+
+### 前端错误处理
+
+```typescript
+const handleSSEEvent = (event: SSEEvent) => {
+  if (event.type === 'error') {
+    // 显示错误 Toast
+    showErrorToast(event.data.message)
+
+    // 如果是 session_not_found，清除本地 session
+    if (event.data.code === 'session_not_found') {
+      clearSession(event.data.sessionId)
+    }
+  }
+}
+```
+
+### 乐观更新回滚
+
+发送消息时采用乐观更新。如果 HTTP 请求失败，回滚本地状态：
+
+```typescript
+const sendMessage = async (sessionId: string, content: string) => {
+  // 1. 乐观更新：立即显示用户消息
+  const tempMessage = { id: 'temp', sessionId, role: 'user', content, timestamp: Date.now() }
+  setMessages(prev => append(prev, tempMessage))
+
+  try {
+    // 2. 发送到后端
+    await api.sendMessage(sessionId, content)
+  } catch (error) {
+    // 3. 失败时回滚
+    setMessages(prev => remove(prev, tempMessage.id))
+    showErrorToast('发送失败，请重试')
+  }
+}
 ```
 
 ---
