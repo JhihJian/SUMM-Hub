@@ -1,0 +1,25 @@
+{
+  "name": "feishu-connector",
+  "version": "1.0.0",
+  "description": "Feishu bidirectional messaging connector for SUMM-Hub",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.30.0",
+    "nats": "^2.18.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/uuid": "^9.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0",
+    "vitest": "^3.0.0"
+  }
+}

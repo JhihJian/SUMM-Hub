@@ -1,0 +1,6 @@
+{
+  "name": "e2e-mock-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mock AI consumer for E2E testing"
+}

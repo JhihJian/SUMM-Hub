@@ -1,0 +1,74 @@
+# E2E Test Docker Compose Configuration
+# Usage: docker compose -f docker-compose.e2e.yml up --abort-on-container-exit
+
+services:
+  nats:
+    image: nats:2.10-alpine
+    command:
+      - "--jetstream"
+      - "--store_dir=/data"
+      - "-m"
+      - "8222"
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - nats_data:/data
+
+  feishu-connector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - FEISHU_APP_ID=${FEISHU_APP_ID:-test_app_id}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET:-test_app_secret}
+      - NATS_URL=nats://nats:4222
+      - TRIGGER_PREFIX=#
+    depends_on:
+      nats:
+        condition: service_healthy
+
+  mock-ai:
+    image: node:20-slim
+    working_dir: /app
+    volumes:
+      - ./test/e2e-mock-ai:/app
+    command: |
+      sh -c '
+        npm install nats@^2.18.0 &&
+        node mock-ai.js
+      '
+    environment:
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      nats:
+        condition: service_healthy
+      feishu-connector:
+        condition: service_started
+
+  e2e-test:
+    image: node:20-slim
+    working_dir: /app
+    volumes:
+      - ./test/e2e-runner:/app
+    command: |
+      sh -c '
+        npm install nats@^2.18.0 &&
+        node runner.js
+      '
+    environment:
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      nats:
+        condition: service_healthy
+      mock-ai:
+        condition: service_started
+
+volumes:
+  nats_data:
