@@ -1,0 +1,73 @@
+services:
+  # Frontend - Vite dev server
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - summ-network
+
+  # Backend - Hono API server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NATS_URL=nats://nats:4222
+      - FRONTEND_URL=http://localhost:5173
+    depends_on:
+      - nats
+    networks:
+      - summ-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # NATS - Message broker
+  nats:
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command:
+      - "--http_port=8222"
+      - "--jetstream"
+      - "--store_dir=/data"
+    volumes:
+      - nats-data:/data
+    networks:
+      - summ-network
+
+  # Claude Code Consumer (optional - for full stack)
+  claude-consumer:
+    build:
+      context: ../consumer/claude-code-consumer
+      dockerfile: Dockerfile
+    environment:
+      - NATS_URL=nats://nats:4222
+      - CONSUMER_ID=0
+      - CONSUMER_TOTAL=1
+    depends_on:
+      - nats
+    networks:
+      - summ-network
+    profiles:
+      - consumer
+
+networks:
+  summ-network:
+    driver: bridge
+
+volumes:
+  nats-data:
