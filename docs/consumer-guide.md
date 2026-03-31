@@ -353,5 +353,123 @@ func (c *Consumer) publishError(msg *nats.Msg, code, message string) {
 
 ---
 
-*版本: v1.0*
-*更新日期: 2026-03-17*
+## summctl 集成要求
+
+所有 Consumer 必须满足以下要求才能被 `summctl` 管理：
+
+### 1. 目录结构要求
+
+```
+consumer/
+└── your-consumer-name/        # Consumer 目录名即为 consumer 名称
+    ├── docker-compose.yml     # 必须存在
+    ├── Dockerfile             # 构建镜像用
+    └── src/                   # 源代码
+```
+
+### 2. docker-compose.yml 要求
+
+```yaml
+services:
+  consumer:
+    image: your-consumer:latest
+    environment:
+      # 必须支持以下环境变量
+      NATS_URL: ${NATS_URL:-nats://host.docker.internal:6422}
+    restart: unless-stopped
+```
+
+**必须项：**
+- 服务名必须是 `consumer`（单服务）或有明确的主服务名
+- 必须支持 `NATS_URL` 环境变量
+- 必须配置 `restart` 策略
+
+### 3. 在 consumers.yaml 中注册
+
+在项目根目录 `consumers.yaml` 添加配置：
+
+```yaml
+consumers:
+  your-consumer-name:
+    description: "简短描述 Consumer 的功能"
+    path: ./consumer/your-consumer-name
+    subjects:
+      subscribe:
+        - summ.ai.input           # 订阅的 subject
+      publish:
+        - summ.ai.output          # 发布的 subject
+        - summ.ai.error           # 发布错误的 subject（如有）
+    env:
+      NATS_URL: ${NATS_URL:-nats://host.docker.internal:6422}
+      YOUR_API_KEY: ${YOUR_API_KEY:-}    # 带默认值的环境变量
+```
+
+**字段说明：**
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `description` | ✅ | Consumer 功能描述，用于 `summctl info` 显示 |
+| `path` | ✅ | docker-compose.yml 所在目录，相对于项目根目录 |
+| `subjects.subscribe` | ✅ | 订阅的 NATS Subject 列表 |
+| `subjects.publish` | ✅ | 发布的 NATS Subject 列表，无则为空数组 `[]` |
+| `env` | ❌ | 环境变量配置，支持 `${VAR}` 和 `${VAR:-default}` |
+
+### 4. Subject 命名规范
+
+```
+summ.<domain>.<action>
+```
+
+| 域 | 示例 Subject | 说明 |
+|----|-------------|------|
+| `ai` | `summ.ai.input` | AI 处理输入 |
+| `ai` | `summ.ai.output` | AI 处理输出 |
+| `ai` | `summ.ai.error` | AI 处理错误 |
+| `notify` | `summ.notify.event` | 通知事件 |
+| `notify` | `summ.notify.info` | 通知信息 |
+
+### 5. 环境变量约定
+
+| 变量 | 必需 | 说明 |
+|------|------|------|
+| `NATS_URL` | ✅ | NATS 服务器地址 |
+| `CONSUMER_ID` | ❌ | 多实例部署时使用 |
+| `CONSUMER_TOTAL` | ❌ | 多实例部署时使用 |
+| 业务相关 | 按需 | API Key、Token 等 |
+
+**敏感信息处理：**
+- 使用 `${SECRET_VAR:-}` 格式，默认为空
+- 启动前必须设置环境变量
+- 不要在配置文件中硬编码
+
+### 6. 新建 Consumer 检查清单
+
+- [ ] 目录结构符合要求
+- [ ] docker-compose.yml 存在且配置正确
+- [ ] 在 `consumers.yaml` 中注册
+- [ ] `subjects.subscribe` 和 `subjects.publish` 声明完整
+- [ ] `summctl status` 能正确显示状态
+- [ ] `summctl start/stop` 能正常工作
+- [ ] `summctl topology` 能正确显示拓扑
+
+### 7. 验证命令
+
+```bash
+# 查看是否注册成功
+summctl status | grep your-consumer-name
+
+# 查看详情
+summctl info your-consumer-name
+
+# 测试启动
+summctl start your-consumer-name
+summctl logs your-consumer-name
+
+# 查看拓扑
+summctl topology
+```
+
+---
+
+*版本: v1.1*
+*更新日期: 2026-03-31*
