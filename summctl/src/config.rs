@@ -15,13 +15,16 @@ pub struct Config {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Defaults {
+    #[serde(default)]
     pub nats_url: Option<String>,
+    #[serde(default)]
     pub log_level: Option<String>,
 }
 
 /// 单个 Consumer 配置
 #[derive(Debug, Deserialize, Clone)]
 pub struct ConsumerConfig {
+    #[serde(default)]
     pub description: String,
     pub path: PathBuf,
     pub subjects: Subjects,
@@ -31,7 +34,9 @@ pub struct ConsumerConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Subjects {
+    #[serde(default)]
     pub subscribe: Vec<String>,
+    #[serde(default)]
     pub publish: Vec<String>,
 }
 
@@ -42,8 +47,18 @@ impl Config {
             .map_err(|_| SummctlError::ConfigNotFound(path.display().to_string()))?;
         let mut config: Config = serde_yaml::from_str(&content)?;
 
+        // 获取默认值
+        let default_nats = config.defaults.as_ref().and_then(|d| d.nats_url.clone());
+
         // 替换环境变量
         for consumer in config.consumers.values_mut() {
+            // 如果没有设置 NATS_URL，使用默认值
+            if !consumer.env.contains_key("NATS_URL") {
+                if let Some(ref nats_url) = default_nats {
+                    consumer.env.insert("NATS_URL".to_string(), nats_url.clone());
+                }
+            }
+
             for value in consumer.env.values_mut() {
                 *value = expand_env_vars(value)?;
             }

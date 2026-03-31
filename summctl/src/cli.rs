@@ -1,22 +1,66 @@
 use crate::config::Config;
 use crate::docker::DockerCompose;
-use crate::error::Result;
+use crate::error::{Result, SummctlError};
 use crate::status::StatusChecker;
 use crate::topology::Topology;
 use clap::{Parser, Subcommand};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[command(name = "summctl")]
 #[command(about = "SUMM-Hub Consumer Management CLI", long_about = None)]
 #[command(version)]
 pub struct Cli {
-    /// Path to consumers.yaml
-    #[arg(short, long, global = true, default_value = "consumers.yaml")]
-    config: String,
+    /// Path to consumers.yaml (auto-detected if not specified)
+    #[arg(short, long, global = true)]
+    config: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Commands,
+}
+
+/// Find config file in order: -c option > SUMMCTL_CONFIG env > git root > current dir
+fn find_config_file(explicit_path: Option<&Path>) -> Result<PathBuf> {
+    // 1. Explicit path via -c option
+    if let Some(path) = explicit_path {
+        if path.exists() {
+            return Ok(path.to_path_buf());
+        }
+        return Err(SummctlError::ConfigNotFound(path.display().to_string()));
+    }
+
+    // 2. Environment variable
+    if let Ok(path) = std::env::var("SUMMCTL_CONFIG") {
+        let p = PathBuf::from(&path);
+        if p.exists() {
+            return Ok(p);
+        }
+    }
+
+    // 3. Git root directory
+    if let Ok(output) = std::process::Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+    {
+        if output.status.success() {
+            let root = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let config = PathBuf::from(&root).join("consumers.yaml");
+            if config.exists() {
+                return Ok(config);
+            }
+        }
+    }
+
+    // 4. Current directory
+    let local = PathBuf::from("consumers.yaml");
+    if local.exists() {
+        return Ok(local);
+    }
+
+    Err(SummctlError::ConfigNotFound(
+        "consumers.yaml not found. Use -c option, set SUMMCTL_CONFIG, or run from project directory."
+            .to_string(),
+    ))
 }
 
 #[derive(Subcommand)]
@@ -63,8 +107,9 @@ enum Commands {
 
 pub async fn run() -> Result<()> {
     let cli = Cli::parse();
-    let config_path = Path::new(&cli.config);
-    let config = Config::load(config_path)?;
+    let config_path = find_config_file(cli.config.as_deref())?;
+    tracing::debug!("Using config: {}", config_path.display());
+    let config = Config::load(&config_path)?;
 
     match cli.command {
         Commands::Status => {
