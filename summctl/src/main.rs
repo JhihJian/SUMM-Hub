@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod discover;
 mod docker;
 mod error;
 mod status;

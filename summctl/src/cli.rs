@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::discover::{discover_consumers, format_discovered_table, DiscoveredConsumer};
 use crate::docker::DockerCompose;
 use crate::error::{Result, SummctlError};
 use crate::status::StatusChecker;
@@ -65,8 +66,11 @@ fn find_config_file(explicit_path: Option<&Path>) -> Result<PathBuf> {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// List all consumers and their status
+    /// List all consumers from consumers.yaml and their status
     Status,
+
+    /// Discover running consumers from Docker (auto-discovery)
+    Discover,
 
     /// Start a consumer
     Start {
@@ -107,11 +111,22 @@ enum Commands {
 
 pub async fn run() -> Result<()> {
     let cli = Cli::parse();
+
+    // Discover command doesn't need config file
+    if matches!(cli.command, Commands::Discover) {
+        let consumers = discover_consumers()?;
+        println!("{}", format_discovered_table(&consumers));
+        return Ok(());
+    }
+
+    // Other commands need config file
     let config_path = find_config_file(cli.config.as_deref())?;
     tracing::debug!("Using config: {}", config_path.display());
     let config = Config::load(&config_path)?;
 
     match cli.command {
+        Commands::Discover => unreachable!(),
+
         Commands::Status => {
             let checker = StatusChecker::new(&config);
             let statuses = checker.check_all().await?;
