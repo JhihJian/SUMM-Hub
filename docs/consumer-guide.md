@@ -355,7 +355,92 @@ func (c *Consumer) publishError(msg *nats.Msg, code, message string) {
 
 ## summctl 集成要求
 
-所有 Consumer 必须满足以下要求才能被 `summctl` 管理：
+summctl 支持两种方式管理 Consumer：
+
+### 方式一：自动发现（推荐）
+
+Consumer 通过 Docker Labels 自声明，summctl 自动发现运行中的 Consumer。
+
+**docker-compose.yml 配置：**
+
+```yaml
+services:
+  consumer:
+    image: your-consumer:latest
+    labels:
+      # 必需：声明这是 SUMM Consumer
+      summ.dev/role: "consumer"
+      # 可选：Consumer 名称（默认用容器名）
+      summ.dev/name: "your-consumer-name"
+      # 必需：订阅的 subjects（逗号分隔）
+      summ.dev/subscribe: "summ.ai.input"
+      # 必需：发布的 subjects（逗号分隔）
+      summ.dev/publish: "summ.ai.output,summ.ai.error"
+    environment:
+      NATS_URL: nats://host.docker.internal:6422
+    restart: unless-stopped
+```
+
+**docker run 方式：**
+
+```bash
+docker run -d \
+  --label summ.dev/role=consumer \
+  --label summ.dev/name=my-consumer \
+  --label summ.dev/subscribe="summ.ai.input" \
+  --label summ.dev/publish="summ.ai.output,summ.ai.error" \
+  -e NATS_URL=nats://host.docker.internal:6422 \
+  your-consumer:latest
+```
+
+**Labels 说明：**
+
+| Label | 必需 | 说明 |
+|-------|------|------|
+| `summ.dev/role` | ✅ | 必须为 `consumer`，用于标识 |
+| `summ.dev/name` | ❌ | Consumer 名称，默认用容器名 |
+| `summ.dev/subscribe` | ✅ | 订阅的 subjects，逗号分隔 |
+| `summ.dev/publish` | ✅ | 发布的 subjects，逗号分隔，无则为空 |
+
+**验证：**
+
+```bash
+# 发现运行中的 Consumer
+summctl discover
+
+# 输出示例
+NAME                STATUS   CONTAINER    SUBJECTS IN        SUBJECTS OUT
+feishu-connector    running  a1b2c3d4e5f  summ.ai.input      summ.ai.output
+claude-code         running  f6e7d8c9b0a  summ.ai.input      summ.ai.output,summ.ai.error
+```
+
+### 方式二：配置文件（传统）
+
+通过 `consumers.yaml` 静态配置，适合需要管理 compose 文件路径的场景。
+
+**consumers.yaml 配置：**
+
+```yaml
+consumers:
+  your-consumer-name:
+    description: "Consumer 功能描述"
+    path: ./consumer/your-consumer-name
+    subjects:
+      subscribe: [summ.ai.input]
+      publish: [summ.ai.output]
+    env:
+      NATS_URL: ${NATS_URL:-nats://host.docker.internal:6422}
+```
+
+**验证：**
+
+```bash
+summctl status
+```
+
+---
+
+## 详细配置说明
 
 ### 1. 目录结构要求
 
@@ -374,7 +459,6 @@ services:
   consumer:
     image: your-consumer:latest
     environment:
-      # 必须支持以下环境变量
       NATS_URL: ${NATS_URL:-nats://host.docker.internal:6422}
     restart: unless-stopped
 ```
@@ -383,36 +467,6 @@ services:
 - 服务名必须是 `consumer`（单服务）或有明确的主服务名
 - 必须支持 `NATS_URL` 环境变量
 - 必须配置 `restart` 策略
-
-### 3. 在 consumers.yaml 中注册
-
-在项目根目录 `consumers.yaml` 添加配置：
-
-```yaml
-consumers:
-  your-consumer-name:
-    description: "简短描述 Consumer 的功能"
-    path: ./consumer/your-consumer-name
-    subjects:
-      subscribe:
-        - summ.ai.input           # 订阅的 subject
-      publish:
-        - summ.ai.output          # 发布的 subject
-        - summ.ai.error           # 发布错误的 subject（如有）
-    env:
-      NATS_URL: ${NATS_URL:-nats://host.docker.internal:6422}
-      YOUR_API_KEY: ${YOUR_API_KEY:-}    # 带默认值的环境变量
-```
-
-**字段说明：**
-
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| `description` | ✅ | Consumer 功能描述，用于 `summctl info` 显示 |
-| `path` | ✅ | docker-compose.yml 所在目录，相对于项目根目录 |
-| `subjects.subscribe` | ✅ | 订阅的 NATS Subject 列表 |
-| `subjects.publish` | ✅ | 发布的 NATS Subject 列表，无则为空数组 `[]` |
-| `env` | ❌ | 环境变量配置，支持 `${VAR}` 和 `${VAR:-default}` |
 
 ### 4. Subject 命名规范
 
@@ -471,5 +525,5 @@ summctl topology
 
 ---
 
-*版本: v1.1*
+*版本: v1.2*
 *更新日期: 2026-03-31*

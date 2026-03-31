@@ -80,7 +80,10 @@ consumers:
 ### 常用命令
 
 ```bash
-# 查看所有 consumer 状态
+# 发现运行中的 consumer（自动发现，无需配置文件）
+summctl discover
+
+# 查看所有 consumer 状态（需要 consumers.yaml）
 summctl status
 
 # 启动/停止/重启
@@ -96,6 +99,32 @@ summctl logs feishu-connector -f
 
 # 查看 Subject 拓扑
 summctl topology
+```
+
+### Consumer 自声明 Labels
+
+Consumer 可通过 Docker Labels 自声明，实现完全去中心化：
+
+```yaml
+# docker-compose.yml
+services:
+  consumer:
+    image: feishu-connector
+    labels:
+      summ.dev/role: "consumer"
+      summ.dev/name: "feishu-connector"
+      summ.dev/subscribe: "summ.ai.input"
+      summ.dev/publish: "summ.ai.output"
+```
+
+```bash
+# 或 docker run
+docker run -d \
+  --label summ.dev/role=consumer \
+  --label summ.dev/name=my-consumer \
+  --label summ.dev/subscribe="summ.ai.input" \
+  --label summ.dev/publish="summ.ai.output" \
+  my-consumer:latest
 ```
 
 ### 全局运行
