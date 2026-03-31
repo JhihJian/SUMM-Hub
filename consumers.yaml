@@ -1,0 +1,45 @@
+# SUMM-Hub Consumer 配置清单
+# 路径: /data/dev/SUMM-Hub/consumers.yaml
+#
+# 使用 summctl 管理所有 consumer:
+#   summctl status          - 查看所有consumer状态
+#   summctl start <name>    - 启动consumer
+#   summctl stop <name>     - 停止consumer
+#   summctl topology        - 查看Subject拓扑
+
+defaults:
+  nats_url: nats://host.docker.internal:6422
+  log_level: info
+
+consumers:
+  feishu-connector:
+    description: "飞书双向消息连接器"
+    path: ./consumer/feishu-connector
+    subjects:
+      subscribe: [summ.ai.input]
+      publish: [summ.ai.output]
+    env:
+      FEISHU_APP_ID: ${FEISHU_APP_ID:-}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
+      NATS_URL: ${NATS_URL:-nats://host.docker.internal:6422}
+
+  claude-code-consumer:
+    description: "Claude Code AI处理"
+    path: ./consumer/claude-code-consumer/deploy
+    subjects:
+      subscribe: [summ.ai.input]
+      publish: [summ.ai.output, summ.ai.error]
+    env:
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN:-}
+      NATS_URL: nats://summ-hub-nats-1:4222
+
+  script-consumer:
+    description: "脚本执行消费器"
+    path: ./consumer/script-consumer
+    subjects:
+      subscribe: [summ.notify.info]
+      publish: []
+    env:
+      NATS_URL: ${NATS_URL:-nats://host.docker.internal:6422}
+      DINGTALK_TOKEN: ${DINGTALK_TOKEN:-}
