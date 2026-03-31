@@ -98,6 +98,22 @@ summctl logs feishu-connector -f
 summctl topology
 ```
 
+### 全局运行
+
+summctl 支持从任意目录运行，配置文件查找顺序：
+
+1. **-c 选项** - 显式指定：`summctl -c /path/to/consumers.yaml status`
+2. **SUMMCTL_CONFIG 环境变量** - `export SUMMCTL_CONFIG=/data/dev/SUMM-Hub/consumers.yaml`
+3. **Git 根目录** - 自动查找 git 仓库根目录的 `consumers.yaml`
+4. **当前目录** - `./consumers.yaml`
+
+推荐方式：设置环境变量
+
+```bash
+# 添加到 ~/.bashrc 或 ~/.zshrc
+export SUMMCTL_CONFIG=/data/dev/SUMM-Hub/consumers.yaml
+```
+
 ### 添加新 Consumer
 
 1. 在 `consumers.yaml` 中添加配置
