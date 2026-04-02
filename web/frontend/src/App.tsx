@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react'
 import { SessionList } from './components/SessionList'
-import { ChatView } from './components/ChatView'
+import { AssistantChat } from './components/AssistantChat'
 import { useSSE } from './hooks/useSSE'
 import { useSessions } from './hooks/useSessions'
 import type { SSEEvent } from './types'
@@ -97,11 +97,17 @@ function App() {
 
         {/* Chat view */}
         <div className="flex-1 overflow-hidden">
-          <ChatView
-            messages={currentMessages}
-            onSendMessage={handleSendMessage}
-            isDisabled={!sseConnected}
-          />
+          {currentMessages === null ? (
+            <div className="flex items-center justify-center h-full bg-gray-50 text-gray-500">
+              <p>Select a session or create a new one to start chatting.</p>
+            </div>
+          ) : (
+            <AssistantChat
+              messages={currentMessages}
+              onSendMessage={handleSendMessage}
+              isDisabled={!sseConnected}
+            />
+          )}
         </div>
       </div>
     </div>
