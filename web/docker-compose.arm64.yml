@@ -1,0 +1,92 @@
+# Docker Compose for ARM64 deployment (pre-built images)
+# Self-contained - includes NATS server
+# Backend auto-initializes JetStream streams on startup
+
+services:
+  # NATS Server with JetStream
+  nats:
+    image: nats:2.10
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command:
+      - "--http_port=8222"
+      - "--jetstream"
+      - "--store_dir=/data"
+    volumes:
+      - nats-data:/data
+    networks:
+      - summ-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # Frontend - nginx serving static files
+  frontend:
+    image: summ-hub-frontend:arm64
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - summ-network
+
+  # Backend - Hono API server (auto-initializes streams)
+  backend:
+    image: summ-hub-backend:arm64
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NATS_URL=nats://nats:4222
+      - FRONTEND_URL=http://localhost:5173
+    depends_on:
+      nats:
+        condition: service_healthy
+    networks:
+      - summ-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Claude Code Consumer (optional - enable with --profile consumer)
+  claude-consumer:
+    image: summ-hub-claude-consumer:arm64
+    environment:
+      - NATS_URL=nats://nats:4222
+      - CONSUMER_ID=0
+      - CONSUMER_TOTAL=1
+      - ENTITY_TYPE=ai
+      - WORKSPACE_DIR=/workspace
+      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL}
+      - ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL}
+    volumes:
+      - ./workspace:/workspace
+    depends_on:
+      nats:
+        condition: service_healthy
+    networks:
+      - summ-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles:
+      - consumer
+
+networks:
+  summ-network:
+    driver: bridge
+
+volumes:
+  nats-data:

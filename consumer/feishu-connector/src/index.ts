@@ -18,6 +18,10 @@ function getConfig(): FeishuConnectorConfig {
     appSecret: process.env.FEISHU_APP_SECRET!,
     natsUrl: process.env.NATS_URL || "nats://localhost:4222",
     triggerPrefix: process.env.TRIGGER_PREFIX || "#",
+    inputSubject: process.env.INPUT_SUBJECT || "summ.ai.input",
+    outputSubject: process.env.OUTPUT_SUBJECT || "summ.ai.output",
+    botOpenId: process.env.BOT_OPEN_ID,
+    logLevel: (process.env.LOG_LEVEL as FeishuConnectorConfig["logLevel"]) || "info",
   };
 }
 
@@ -30,6 +34,8 @@ async function main() {
   console.log("[feishu-connector] Starting...");
   console.log(`[feishu-connector] NATS URL: ${config.natsUrl}`);
   console.log(`[feishu-connector] Trigger prefix: ${config.triggerPrefix}`);
+  console.log(`[feishu-connector] Input subject: ${config.inputSubject}`);
+  console.log(`[feishu-connector] Output subject: ${config.outputSubject}`);
 
   // Create connector
   const connector = new FeishuConnector({

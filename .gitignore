@@ -47,3 +47,10 @@ nats-data/
 # NATS CLI binary
 nats
 nats-*
+
+# Docker image exports
+*.tar
+images-arm64/
+
+# Test screenshots
+frontend-test-*.png

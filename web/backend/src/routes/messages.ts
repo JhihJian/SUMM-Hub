@@ -34,6 +34,7 @@ export function createMessagesRoutes(store: SessionStore, nats: NatsService): Ho
 
     // Store user message
     store.addMessage(sessionId, {
+      id: nats.generateMessageId(),
       role: 'user',
       content: body.content,
     })

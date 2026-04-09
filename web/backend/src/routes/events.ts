@@ -49,6 +49,7 @@ export function createEventsRoute(store: SessionStore, nats: NatsService): Hono 
         // Store message if session exists
         if (store.get(msg.session_id)) {
           store.addMessage(msg.session_id, {
+            id: msg.message_id,
             role: 'assistant',
             content: msg.content || '',
           })

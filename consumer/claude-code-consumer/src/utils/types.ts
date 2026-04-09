@@ -52,6 +52,9 @@ export interface Session {
  * Claude SDK 输出消息类型
  */
 export type SDKMessage =
+  | { type: 'system'; subtype?: string; cwd?: string; session_id?: string }
+  | { type: 'assistant'; message?: { content?: Array<{ type: string; text?: string }> } }
+  | { type: 'result'; subtype?: string; result?: string; is_error?: boolean }
   | { type: 'user_message'; content: string }
   | { type: 'assistant_message'; content: string }
   | { type: 'content_block_start'; index: number }
@@ -78,4 +81,6 @@ export interface ConsumerConfig {
   entityType: string;
   /** Claude 运行时工作目录（用于会话的默认工作目录） */
   workspaceDir: string;
+  /** Queue Group 名称（用于负载均衡） */
+  queueGroup: string;
 }

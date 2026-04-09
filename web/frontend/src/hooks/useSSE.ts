@@ -33,6 +33,9 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEReturn {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastHeartbeatRef = useRef<number>(Date.now())
   const heartbeatCheckRef = useRef<NodeJS.Timeout | null>(null)
+  // Store onEvent in a ref to avoid reconnection loop
+  const onEventRef = useRef(onEvent)
+  onEventRef.current = onEvent
 
   const clearReconnectTimeout = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -95,9 +98,9 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEReturn {
           return
         }
 
-        // Call the onEvent callback
-        if (onEvent) {
-          onEvent(data)
+        // Call the onEvent callback using ref
+        if (onEventRef.current) {
+          onEventRef.current(data)
         }
       } catch (e) {
         console.error('Failed to parse SSE event:', e)
@@ -129,7 +132,7 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEReturn {
         connect()
       }
     }, 10000) // Check every 10 seconds
-  }, [baseUrl, onEvent, reconnectInterval, maxReconnectAttempts, heartbeatTimeout, disconnect])
+  }, [baseUrl, reconnectInterval, maxReconnectAttempts, heartbeatTimeout, disconnect])
 
   const reconnect = useCallback(() => {
     disconnect()
@@ -142,7 +145,8 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEReturn {
     return () => {
       disconnect()
     }
-  }, [connect, disconnect])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run once on mount
 
   return { connected, error, disconnect, reconnect }
 }

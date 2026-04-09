@@ -1,0 +1,55 @@
+# Feishu-Connector Docker Compose
+# 飞书双向消息连接器 - 生产环境配置
+#
+# 前置条件:
+#   - NATS 服务已部署并可访问
+#
+# 使用方法:
+#   1. 复制 .env.example 为 .env 并填写配置
+#   2. docker compose up -d
+#   3. docker compose logs -f feishu-connector
+#
+# 宿主机服务访问:
+#   - 使用 host.docker.internal 访问宿主机服务
+#   - 例如 NATS 在宿主机 6422 端口: NATS_URL=nats://host.docker.internal:6422
+
+services:
+  feishu-connector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: feishu-connector:${IMAGE_TAG:-latest}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # === 必需配置 ===
+      - FEISHU_APP_ID=${FEISHU_APP_ID:?FEISHU_APP_ID is required}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET:?FEISHU_APP_SECRET is required}
+
+      # === NATS 配置 ===
+      - NATS_URL=${NATS_URL:?NATS_URL is required}
+
+      # === 消息 Subject 配置 ===
+      - INPUT_SUBJECT=${INPUT_SUBJECT:-summ.ai.input}
+      - OUTPUT_SUBJECT=${OUTPUT_SUBJECT:-summ.ai.output}
+
+      # === 触发器配置 ===
+      - TRIGGER_PREFIX=${TRIGGER_PREFIX:-#}
+
+      # === Bot 配置 ===
+      - BOT_OPEN_ID=${BOT_OPEN_ID:-}
+
+      # === 日志级别 ===
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# 网络配置 (如果需要连接到外部 Docker 网络)
+# networks:
+#   default:
+#     external:
+#       name: summ-hub_network

@@ -12,6 +12,14 @@ export interface FeishuConnectorConfig {
   natsUrl: string;
   /** Session ID 前缀 (默认: #) */
   triggerPrefix: string;
+  /** AI 输入消息 Subject (发送给 AI) */
+  inputSubject: string;
+  /** AI 输出消息 Subject (AI 响应) */
+  outputSubject: string;
+  /** Bot open_id (用于群聊 @mention 检测) */
+  botOpenId?: string;
+  /** 日志级别 */
+  logLevel?: "debug" | "info" | "warn" | "error";
 }
 
 /**

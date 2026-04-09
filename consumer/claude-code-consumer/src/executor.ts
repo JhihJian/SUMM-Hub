@@ -24,7 +24,7 @@ export class ClaudeExecutor {
       throw new Error('Claude process already running');
     }
 
-    const args = ['--output-format', 'stream-json'];
+    const args = ['--print', '--verbose', '--output-format', 'stream-json', '--dangerously-skip-permissions'];
 
     if (resume) {
       args.push('--resume', resume);
@@ -36,11 +36,15 @@ export class ClaudeExecutor {
     });
 
     this.process.on('error', (err) => {
-      console.error('Claude process error:', err);
+      console.error('[Executor] Claude process error:', err);
     });
 
     this.process.stderr?.on('data', (data) => {
-      console.error('Claude stderr:', data.toString());
+      const stderr = data.toString();
+      // 只打印非 JSON 的 stderr（真正的错误）
+      if (!stderr.startsWith('{')) {
+        console.error('[Executor] Claude stderr:', stderr);
+      }
     });
   }
 
@@ -58,6 +62,7 @@ export class ClaudeExecutor {
     });
 
     this.process.stdin.write(payload + '\n');
+    this.process.stdin.end(); // 关闭 stdin，通知 claude 输入结束
   }
 
   /**

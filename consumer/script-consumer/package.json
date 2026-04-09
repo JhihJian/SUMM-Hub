@@ -1,0 +1,22 @@
+{
+  "name": "@jhihjian/summ-script-consumer",
+  "version": "1.0.0",
+  "description": "通用脚本 Consumer - 订阅 NATS 消息并执行指定命令",
+  "main": "dist/index.js",
+  "bin": {
+    "script-consumer": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "nats": "^2.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}

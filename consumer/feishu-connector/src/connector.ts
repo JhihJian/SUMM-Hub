@@ -66,7 +66,7 @@ export class FeishuConnector {
     });
 
     // Subscribe to AI output messages
-    this.outputSubscription = this.nc.subscribe("summ.ai.output", {
+    this.outputSubscription = this.nc.subscribe(this.config.outputSubject, {
       queue: "feishu-connector",
     });
     this.startOutputHandler();
@@ -153,7 +153,7 @@ export class FeishuConnector {
       };
 
       // Publish to NATS
-      this.nc?.publish("summ.ai.input", this.encodeMessage(inputMessage));
+      this.nc?.publish(this.config.inputSubject, this.encodeMessage(inputMessage));
 
       this.log(
         `[feishu-connector] Published message to NATS: session=${parsed.sessionId}, content="${parsed.content.slice(0, 50)}..."`,

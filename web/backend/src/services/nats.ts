@@ -1,5 +1,41 @@
-import { connect, NatsConnection, JetStreamClient, Subscription } from 'nats'
+import { connect, NatsConnection, JetStreamClient, JetStreamManager, Subscription, RetentionPolicy, StorageType } from 'nats'
 import type { NatsInputMessage, NatsOutputMessage, NatsErrorMessage } from '../types'
+
+// NATS monitoring types
+export interface StreamInfo {
+  name: string
+  subjects: string[]
+  messageCount: number
+  byteSize: number
+  firstSeq: number
+  lastSeq: number
+  createdAt: Date
+  config: {
+    retention: string
+    maxMsgs: number
+    maxAge: number // in seconds
+    storage: string
+  }
+}
+
+export interface ConsumerInfo {
+  name: string
+  streamName: string
+  deliverSubject?: string
+  ackPolicy: string
+  deliverPolicy: string
+  pendingMessages: number
+  pendingBytes: number
+  redelivered: number
+  createdAt: Date
+}
+
+export interface StoredMessage {
+  seq: number
+  subject: string
+  timestamp: number
+  data: unknown
+}
 
 export interface NatsServiceConfig {
   url: string
@@ -28,6 +64,43 @@ export class NatsService {
       servers: this.config.url,
     })
     this.js = this.nc.jetstream()
+
+    // Auto-initialize streams
+    await this.initializeStreams()
+  }
+
+  /**
+   * Initialize required JetStream streams (idempotent)
+   */
+  private async initializeStreams(): Promise<void> {
+    if (!this.nc) return
+
+    const jsm: JetStreamManager = await this.nc.jetstreamManager()
+
+    const streams = [
+      { name: 'AI_INPUT', subjects: ['summ.ai.input'], maxMsgs: 100000, maxAge: 604800 }, // 7 days
+      { name: 'AI_OUTPUT', subjects: ['summ.ai.output'], maxMsgs: 100000, maxAge: 604800 },
+      { name: 'AI_ERROR', subjects: ['summ.ai.error'], maxMsgs: 10000, maxAge: 2592000 }, // 30 days
+      { name: 'NOTIFY_EVENT', subjects: ['summ.notify.event'], maxMsgs: 50000, maxAge: 259200 }, // 3 days
+    ]
+
+    for (const stream of streams) {
+      try {
+        await jsm.streams.info(stream.name)
+        // Stream exists, skip
+      } catch {
+        // Stream doesn't exist, create it
+        await jsm.streams.add({
+          name: stream.name,
+          subjects: stream.subjects,
+          retention: RetentionPolicy.Limits,
+          max_msgs: stream.maxMsgs,
+          max_age: stream.maxAge * 1e9, // nanoseconds
+          storage: StorageType.File,
+        })
+        console.log(`[NATS] Created stream: ${stream.name}`)
+      }
+    }
   }
 
   /**

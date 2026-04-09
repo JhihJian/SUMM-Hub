@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  script-consumer:
+    image: summ-hub/script-consumer:v1.0.0
+    environment:
+      - NATS_URL=${NATS_URL:-nats://host.docker.internal:6422}
+      - SUBJECT=${SUBJECT:-summ.notify.info}
+      - QUEUE_GROUP=${QUEUE_GROUP:-dingtalk-notify}
+      - COMMAND=/app/scripts/dingtalk-notify.sh
+      - DINGTALK_TOKEN=${DINGTALK_TOKEN}
+    volumes:
+      - ./scripts:/app/scripts:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
