@@ -13,6 +13,7 @@ function loadConfig(): ConsumerConfig {
     sessionTtlMs: parseInt(process.env.SESSION_TTL_MS || '3600000', 10),
     entityType: process.env.ENTITY_TYPE || 'ai',
     workspaceDir: process.env.WORKSPACE_DIR || process.cwd(),
+    workspaceAllowedRoots: process.env.WORKSPACE_ALLOWED_ROOTS || '',
     queueGroup: process.env.QUEUE_GROUP || 'claude-consumers',
   };
 }

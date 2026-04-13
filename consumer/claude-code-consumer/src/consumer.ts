@@ -1,4 +1,6 @@
 import { connect, NatsConnection, JetStreamClient, JetStreamPullSubscription, JsMsg, AckPolicy } from 'nats';
+import path from 'path';
+import fs from 'fs';
 import { ClaudeExecutor } from './executor';
 import { SessionManager } from './session';
 import { ownsSession } from './utils/hash';
@@ -147,8 +149,9 @@ export class ClaudeConsumer {
     let session = this.sessionManager.get(sessionId);
 
     if (!session) {
-      // 使用配置的工作目录，支持外部挂载
-      const workspaceDir = this.config.workspaceDir || process.cwd();
+      // 优先级：消息指定 > 环境变量 > 当前目录
+      const requestedDir = input.workspace || this.config.workspaceDir || process.cwd();
+      const workspaceDir = this.validateWorkspace(requestedDir);
       session = this.sessionManager.create(sessionId, workspaceDir);
     }
 
@@ -299,6 +302,38 @@ export class ClaudeConsumer {
    */
   private generateSessionId(): string {
     return `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  /**
+   * 校验工作空间路径
+   * - 必须存在且是目录
+   * - 如果配置了白名单，路径必须在白名单范围内
+   */
+  private validateWorkspace(requested: string): string {
+    const resolved = path.resolve(requested);
+
+    if (!fs.existsSync(resolved)) {
+      throw new Error(`Workspace not found: ${resolved}`);
+    }
+
+    const stat = fs.statSync(resolved);
+    if (!stat.isDirectory()) {
+      throw new Error(`Workspace is not a directory: ${resolved}`);
+    }
+
+    const allowedRoots = (this.config.workspaceAllowedRoots || '')
+      .split(',')
+      .map(r => r.trim())
+      .filter(Boolean);
+
+    if (allowedRoots.length > 0) {
+      const isAllowed = allowedRoots.some(root => resolved.startsWith(path.resolve(root)));
+      if (!isAllowed) {
+        throw new Error(`Workspace not in allowed roots: ${resolved} (allowed: ${allowedRoots.join(', ')})`);
+      }
+    }
+
+    return resolved;
   }
 
   /**

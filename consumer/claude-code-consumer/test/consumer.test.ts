@@ -14,6 +14,7 @@ describe('ClaudeConsumer', () => {
   let mockConnection: {
     subscribe: ReturnType<typeof vi.fn>;
     close: ReturnType<typeof vi.fn>;
+    jetstream: ReturnType<typeof vi.fn>;
   };
   let mockSubscription: {
     [Symbol.asyncIterator]: () => AsyncIterator<{ data: Uint8Array; respond: ReturnType<typeof vi.fn> }>;
@@ -24,12 +25,19 @@ describe('ClaudeConsumer', () => {
     consumerId: 0,
     consumerTotal: 1,
     sessionTtlMs: 3600000,
+    entityType: 'ai',
+    workspaceDir: '/tmp',
+    workspaceAllowedRoots: '',
+    queueGroup: 'claude-consumers',
   };
 
   beforeEach(() => {
     mockConnection = {
       subscribe: vi.fn(),
       close: vi.fn(),
+      jetstream: vi.fn().mockReturnValue({
+        pullSubscribe: vi.fn(),
+      }),
     };
 
     mockSubscription = {

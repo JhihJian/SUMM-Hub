@@ -6,6 +6,8 @@ export interface InputMessage {
   content: string;
   /** Session ID（可选，用于连续对话） */
   session_id?: string;
+  /** 工作空间路径（仅新 session 生效，已有 session 忽略） */
+  workspace?: string;
   /** 消息 ID */
   message_id?: string;
   /** 时间戳 */
@@ -81,6 +83,8 @@ export interface ConsumerConfig {
   entityType: string;
   /** Claude 运行时工作目录（用于会话的默认工作目录） */
   workspaceDir: string;
+  /** 允许的工作空间根目录白名单（逗号分隔，为空则不限制） */
+  workspaceAllowedRoots: string;
   /** Queue Group 名称（用于负载均衡） */
   queueGroup: string;
 }

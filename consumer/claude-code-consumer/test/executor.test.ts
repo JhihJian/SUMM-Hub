@@ -54,7 +54,7 @@ describe('ClaudeExecutor', () => {
     it('should spawn claude process with correct arguments', () => {
       executor.start();
 
-      expect(spawn).toHaveBeenCalledWith('claude', ['--output-format', 'stream-json'], {
+      expect(spawn).toHaveBeenCalledWith('claude', ['--print', '--verbose', '--output-format', 'stream-json', '--dangerously-skip-permissions'], {
         cwd: '/workspace',
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -63,7 +63,7 @@ describe('ClaudeExecutor', () => {
     it('should spawn claude process with --resume flag when resume is provided', () => {
       executor.start('session-123');
 
-      expect(spawn).toHaveBeenCalledWith('claude', ['--output-format', 'stream-json', '--resume', 'session-123'], {
+      expect(spawn).toHaveBeenCalledWith('claude', ['--print', '--verbose', '--output-format', 'stream-json', '--dangerously-skip-permissions', '--resume', 'session-123'], {
         cwd: '/workspace',
         stdio: ['pipe', 'pipe', 'pipe'],
       });
